@@ -1,6 +1,8 @@
 package model;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -33,9 +35,27 @@ public class State {
 	
 	public static void refrIPSEC(){
 		
-		//TODO: via an api to see if public ip the one from vienna is
-		//			or via "ip a" see if awaited ip is here
-		
+		Process process;
+		try {
+			process = Runtime.getRuntime().exec("ipsec status | grep TUNNEL");
+	    	
+	    	BufferedReader stdInput = new BufferedReader(new InputStreamReader(process.getInputStream()));
+	    	
+	    	//System.out.println("Here is the standard output of the command:\n");
+	    	String s = null, a = null;
+	    	while ((s = stdInput.readLine()) != null) {
+	    	    a = s;
+	    	}
+	    	
+	    	if(a != null){
+	    		connectedIPSEC = true;
+	    	} else {
+	    		connectedIPSEC = false;
+	    	}
+    	
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	public static void refrWifi(){

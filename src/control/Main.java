@@ -1,10 +1,16 @@
 package control;
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 
 import model.State;
 
@@ -21,7 +27,22 @@ public class Main {
 		System.out.println("starting prog");
 		
 		piState = new State();
+		
+		//start all things and set it up:
+		//ap
+		executeCommandSH("hostapd /etc/hostapd/hostapd.conf");
+		executeCommandSH("systemctl start isc-dhcp-server");
+		executeCommandSH("ip a add 10.0.1.1 dev wlan0");
+		
+		//TODO: uncomment
+		//executeCommandSH("service networking restart");
 
+		//test before start:
+/*		State.wifiPass = "thebestever";
+		State.wifiSSID = "theotherone";
+		connectToWifi();
+*/
+		
 		//the very big loop
 		while(!stop){
 		
@@ -64,22 +85,30 @@ public class Main {
             
             switch (command) {
             case "startWIFI":
-            	
             	//TODO
             	
                 String ssid = in.readLine();
                 State.wifiSSID = ssid;
                 String pass = in.readLine();
                 State.wifiPass = pass;
+            	State.refrWifi();
+                if(!State.connectedWifi){
+                	connectToWifi();
+                }
+            	State.refrWifi();
+                out.println("WIFI"+State.connectedWifi);
+                out.flush();                
                 
                 break;
             case "startIPSEC":
-            	//TODO: sudo and so on
-            	String[] cmdArray = {"ipsec", "restart"};
-            	executeCommandSH(cmdArray);
-
-            	String[] cmdArray2 = {"ipsec", "up", "home"};
-            	executeCommandSH(cmdArray2);
+            	State.refrIPSEC();
+            	if(!State.connectedIPSEC){
+	            	executeCommandSH("ipsec restart");
+	            	executeCommandSH("ipsec up home");
+            	}
+            	State.refrIPSEC();
+                out.println("IPSEC"+State.connectedIPSEC);
+                out.flush();
             	break;
             case "getWIFI":
             	State.refrWifi();
@@ -103,10 +132,7 @@ public class Main {
             default:
             
         }
-            
         }
-        
-        
         
         
 
@@ -115,15 +141,25 @@ public class Main {
 	}
 	
 	
-	public static boolean executeCommandSH(String[] cmdArray){
-		//String[] cmdArray = new String[1];
-        // first argument is the program we want to open
-        //cmdArray[0] = a;
-        // second argument is a txt file we want to open with notepad
-        //cmdArray[1] = b;
-        //cmdArray[2] = c;
+	public static boolean executeCommandSH(String cmd){	    
         try {
-			Process process = Runtime.getRuntime().exec(cmdArray,null);
+        	Process process = Runtime.getRuntime().exec(cmd);
+        	
+        	BufferedReader stdInput = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        	BufferedReader stdError = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+        	
+        	//System.out.println("Here is the standard output of the command:\n");
+        	String s = null;
+        	while ((s = stdInput.readLine()) != null) {
+        	    System.out.println(s);
+        	}
+
+        	// read any errors from the attempted command
+        	//System.out.println("Here is the standard error of the command (if any):\n");
+        	while ((s = stdError.readLine()) != null) {
+        	    System.out.println(s);
+        	}
+        	
 			return true;
 		} catch (IOException e1) {
 			e1.printStackTrace();
@@ -134,12 +170,22 @@ public class Main {
 	
 	
 	public static void connectToWifi(){		//TODO: boolean?
-		
 		//TODO
+		//executeCommandSH("echo hello >> /etc/wpa_supplicant.conf");
+		//wont work this way, need to do it java style
+		
+		String txt = "\nnetwork={\n\tssid=\"" + State.wifiSSID + "\"\n\tpsk=\"" + State.wifiPass + "\"\n}\n";
+		
+		try {
+		    Files.write(Paths.get("/etc/wpa_supplicant/wpa_supplicant.conf"), txt.getBytes(), StandardOpenOption.APPEND);
+		}catch (IOException e) {
+		    //exception handling left as an exercise for the reader
+		}
+		
+		executeCommandSH("service networking restart");
 		
 	}
 	
-	
-	
+
 
 }
